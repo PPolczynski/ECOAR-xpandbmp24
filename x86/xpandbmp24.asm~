@@ -1,0 +1,140 @@
+global xpandbmp24
+
+;define input data labels
+%define     img  	[ebp+8]  		; points to begining of input img
+%define     scale_num   [ebp+12]
+%define     scale_den   [ebp+16]
+%define     buffer   	[ebp+20]
+
+%define     width       [ebp-4]
+%define     height      [ebp-8]
+%define     bwidth    [ebp-12]
+%define     bnwidth      [ebp-16]
+%define     rem    [ebp-20]
+%define     count       [ebp-24]
+
+xpandbmp24:
+
+    push    ebp                 		; prolog
+    mov     ebp, 	esp
+    sub     esp,	24
+
+    push    ebx                 		; saving conntent of used registers
+    push    esi
+    push    edi
+    
+    mov     esi, 	img     		; putting adres of img into esi register
+
+    mov     eax, 	[esi+0x12]     		; from source file 12h = 18 dec width 4 bytes
+    mov     width, 	eax			; saving the orginal wifth of bmp
+    
+    mov     edx, 	[esi+16h]      		; same for orginal hight
+    mov     height, 	edx
+    
+    mul     dword scale_num     		; edx:eax   width * scale_num
+    div     dword scale_den     		; eax = edx:eax / scale_den
+    imul    eax, 3
+    add     eax, 3
+    and     eax, 0x0fffffffc			; procedure to add potential offset
+    mov     bnwidth, eax      			; new width of bmp in pixels with offest
+
+    mov     eax, width
+    imul    eax, 3
+    add     eax, 3
+    and     eax, 0fffffffch
+    mov     bwidth, eax       			; stores the width of orginal file it bytes + ofset
+
+    add     esi, 54             		; moving pointer to beginig of pixel array
+    
+    mov     edi, buffer       			; get adres of buffer for output file
+    add     edi, 54            			; moving pointer to beginig of pixel array
+    
+    xor     edx, edx            		; edx = 0
+    mov     eax, scale_num
+    div     dword scale_den
+    mov     rem, eax       		; remainder in edx
+
+    mov     ebx, 0              ; this value holds the fractional part of the copy counter (it will be increased by the remainder from the above division and if it crosses scale_den then additional pixel /or line/ will be copied)
+
+expand:
+    push    esi                 ; preserve the (base) address of a source pixels line
+
+    push    ebx                 ; ebx plays the same role in both directions (horizontal and vertical) so we save it before the inner (horizontal) loop
+    push    edi                 ; preserve the (base) address of a destination pixels line
+
+    mov     ecx, width
+    mov     count, ecx          ; this is a temporary (horizontal) counter, it contains the number of pixels in a line to go
+    
+    mov     ebx, 0
+
+line:    
+    mov     ecx, rem
+
+    lodsd                       ; load eax from the address in esi and increase esi by 4 (we actually copy a dword /4 bytes/ however only 3 RGB bytes are relevant)
+    sub     esi, 1              ; a single pixel occupies 3 bytes, but the above instruction has advanced esi by 4, so correct it
+
+copy_pixel:
+    stosd                       ; store eax at the address in edi
+    sub     edi, 1              ; correct edi
+    loop    copy_pixel          ; the loop copies rem bytes from the current source line to the current destination line
+    
+    add     ebx, edx            ; check if a pixel should be copied one more time and if so then copy it
+    cmp     ebx, scale_den
+    jb      next_pixel
+    
+    sub     ebx, scale_den      ; subtract scale_den (truncate the integer part of the value), so we can simply increase and check the value in the future
+
+    stosd                       ; copy a source pixel at the destination line one more time
+    sub     edi, 1
+
+next_pixel:    
+    dec     dword count
+    jnz     line                ; loop until a source line is done
+    
+    pop     edi                 ; now we'll process (whole lines) in the vertical direction, restore the base address of the first line (just generated) in the destination area
+    pop     ebx                 ; restore ebx (it will now act the same way but in the vertical direction)
+    
+    mov     esi, edi            ; the address of the just generated line in the destination buffer
+    add     edi, bnwidth      ; the address of the next line (after the first)
+
+    mov     eax, rem
+    sub     eax, 1              ; the first line (in a group) will now be cloned rem-1 times (-1 because we must exclude the first generated line from the amount)
+    jz      check
+
+copy_line:
+    mov     ecx, bnwidth      ; number of bytes per destination line
+    shr     ecx, 2              ; we copy whole dwords so we must divide the line length in bytes by 4
+    rep movsd                   ; clone a line (esi and edi are updated automatically)
+    
+    sub     esi, bnwidth      ; move back esi by bnwidth bytes, so always the first destination line (in a group of them) is copied
+    
+    dec     eax
+    jnz     copy_line           ; loop until rem-1 iterations are done
+
+check:    
+    add     ebx, edx            ; check if a line should be copied one more time
+    cmp     ebx, scale_den
+    jb      next_line
+    
+    sub     ebx, scale_den
+
+    mov     ecx, bnwidth
+    shr     ecx, 2
+    rep movsd                   ; copy a line one more time
+
+next_line:    
+    pop     esi                 ; restore the base address of the current source line
+
+    add     esi, bwidth       ; advance to the next source line
+
+    dec     dword height
+    jnz     expand              ; loop until all source lines are processed
+    
+    pop     edi                 ; restore the required registers
+    pop     esi
+    pop     ebx
+
+    mov     esp, ebp            ; remove the stack frame
+    pop     ebp
+    ret
+
