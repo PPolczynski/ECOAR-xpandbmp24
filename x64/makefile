@@ -1,4 +1,4 @@
-CC = gcc -m32
+CC = gcc -m64
 NASM = nasm
 
 a.exe : xpandbmp24.o main.o

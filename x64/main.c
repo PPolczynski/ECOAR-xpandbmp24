@@ -61,7 +61,7 @@ int main ( int argc , char ** argv )
     hight = (int)(scalef*hight);
     size = ((width * 3 + 3) & ~3)* hight + 54;
     buffer = ( unsigned char * ) malloc (size);
-    if ( img == NULL )
+    if ( buffer == NULL )
     {
         fprintf ( stderr , "Couldn't allocate memory, aborting\n" ) ;
         fclose ( out ) ;
@@ -72,9 +72,9 @@ int main ( int argc , char ** argv )
     *((unsigned int *)&buffer[22])  =   hight;
     *((unsigned int *)&buffer[18])  =   width;
 
-    printf ( "Enlarging please wait... " ) ;
+    printf ( "Enlarging please wait... \n" ) ;
     xpandbmp24(img, scale_num, scale_den, buffer ) ;
-    printf ( "done. \nWriting date into file ..." ) ;
+    printf ( "done. \nWriting date into file ...\n" ) ;
     fwrite ( buffer , size, 1 , out ) ;
     fclose ( out ) ;
     printf ( "done. \n");

@@ -70,20 +70,20 @@ widthloop:
     lodsd                      			 ; load 4 bytes from esi and put it into eax register increments esi by 4 
     dec     esi                			 ; pixels have only 3 bytes so we need to go back with esi not to lose colors
 
-mulpixel:
+clonepxl:
     stosd                       			; store eax at the address in edi and inc it by 4
     dec     edi                			; pixels have only 3 bytes was too far we dont need that extra byte in pixel
-    loop    mulpixel          			; ecx conteins scale so pixels will be copied scale number of times
+    loop    clonepxl         			; ecx conteins scale so pixels will be copied scale number of times
     
     add     ebx, 	edx          			; increment remider couner
     cmp     ebx, 	scale_den   			; compers remider with scale den
-    jb      next_pixel	    			; if remider < scale_den next pixel should be considered
+    jb      nxtpxl	    			; if remider < scale_den next pixel should be considered
     
     sub     ebx, 	scale_den                   ;remider > scale_den we add adtitional pixel and decrement the counter
     stosd                      			;copy a source pixel at the destination aditional time
     dec     edi
 
-next_pixel:    
+nxtpxl:    
     dec     dword cnt
     jnz     widthloop                		; loop until end of source line
 
